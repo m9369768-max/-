@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="外賣計次"><link rel="apple-touch-icon" id="ati" href="">
+<title>外賣小時計次</title>
+<style>
+:root{--bg:#f4f5f2;--ink:#1c2421;--mute:#7b8580;--acc:#0e7c66;--accfg:#fff;--line:#dfe3df;--card:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121816;--ink:#eef2ef;--mute:#8a958f;--acc:#2fc09f;--accfg:#08251e;--line:#26302c;--card:#1a221f}}
+:root[data-theme="dark"]{--bg:#121816;--ink:#eef2ef;--mute:#8a958f;--acc:#2fc09f;--accfg:#08251e;--line:#26302c;--card:#1a221f}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;-webkit-tap-highlight-color:transparent;user-select:none}
+#clock{font-size:44px;font-weight:300;letter-spacing:1px;font-variant-numeric:tabular-nums;text-align:center}
+#date{font-size:14px;color:var(--mute);text-align:center;margin-top:4px}
+.wrap{position:relative;width:min(70vw,260px);aspect-ratio:1}
+svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.track{stroke:var(--line)}.bar{stroke:var(--acc);transition:stroke-dashoffset .4s linear}
+#tap{position:absolute;inset:14%;border-radius:50%;border:0;background:var(--acc);color:var(--accfg);font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:transform .12s}
+#tap:active{transform:scale(.94)}
+#tap:focus-visible,#settle:focus-visible,#undo:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+#n{font-size:64px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+#tap small{font-size:14px;opacity:.8;margin-top:6px}
+#cd{font-size:34px;font-weight:300;font-variant-numeric:tabular-nums;text-align:center}
+#st{font-size:14px;color:var(--mute);text-align:center;margin-top:4px}
+#undo{display:block;width:min(78vw,300px);min-height:64px;margin:18px auto 0;padding:16px 24px;border-radius:999px;border:2px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:20px;font-weight:500;cursor:pointer}#undo:active{transform:scale(.97)}
+#settle{position:fixed;left:20px;top:calc(72px + env(safe-area-inset-top,0px));padding:13px 22px;border-radius:999px;border:0;background:var(--ink);color:var(--bg);font:inherit;font-size:16px;font-weight:500;cursor:pointer;display:none}
+#settle.show{display:block}
+#hist{position:fixed;left:20px;top:calc(20px + env(safe-area-inset-top,0px));padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
+#hist:focus-visible,#hclose:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+details{border-bottom:1px solid var(--line)}summary{display:flex;justify-content:space-between;padding:12px 0;cursor:pointer;font-size:16px;list-style:none}summary::-webkit-details-marker{display:none}summary b{font-variant-numeric:tabular-nums}details .row{font-size:14px;color:var(--mute);padding:6px 0 6px 12px;border:0}
+#hrows{max-height:55vh;overflow-y:auto}
+#mask,#hmask,#cmask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center}
+#mask.show,#hmask.show,#cmask.show{display:flex}
+#sheet,#hsheet,#csheet{background:var(--card);width:min(100%,460px);border-radius:20px 20px 0 0;padding:24px 24px calc(24px + env(safe-area-inset-bottom,0px))}
+#sheet h2,#hsheet h2,#csheet h2{margin:0 0 4px;font-size:20px}
+#sheet p,#hsheet p,#csheet p{margin:0 0 16px;color:var(--mute);font-size:14px}
+.row{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:16px}
+.row b{font-variant-numeric:tabular-nums}
+.tot{font-weight:600;border-bottom:0;font-size:18px}
+#close,#hclose,#cclose{margin-top:14px;width:100%;padding:13px;border-radius:12px;border:1px solid var(--line);background:none;color:var(--ink);font:inherit;font-size:16px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.bar,#tap{transition:none}}
+#cal{position:fixed;right:20px;top:calc(20px + env(safe-area-inset-top,0px));padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
+#cal:focus-visible,#cclose:focus-visible,#adone:focus-visible,.dd:focus-visible,.rb:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+#csheet{width:min(100%,680px);max-height:90vh;overflow-y:auto}
+.cw{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media (max-width:560px){.cw{grid-template-columns:1fr}}
+.cnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:18px;font-weight:600}
+.cnav button{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:none;color:var(--ink);font-size:20px;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:14px}
+.grid .h{color:var(--mute);padding:4px 0}
+.dd{aspect-ratio:1;border-radius:10px;border:0;background:none;color:var(--ink);font:inherit;cursor:pointer;position:relative}
+.dd.today{outline:1px solid var(--acc)}.dd.sel{background:var(--acc);color:var(--accfg)}
+.dd.has::after{content:"";position:absolute;bottom:4px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:currentColor;opacity:.6}
+.ctt{font-size:17px;font-weight:600;margin:0 0 4px}.cs{color:var(--mute);font-size:14px;margin-bottom:6px}
+.hr{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px;gap:8px}
+.rb{min-height:38px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:none;color:var(--mute);font:inherit;font-size:13px;cursor:pointer}
+.hr.rest .rb{background:var(--acc);color:var(--accfg);border-color:var(--acc)}.rb:disabled{opacity:.35;cursor:default}
+.note{font-size:13px;color:var(--mute);margin:12px 0 0}
+details details{padding-left:6px}details details summary{font-size:15px}
+#alarm{position:fixed;inset:0;z-index:9;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:28px;text-align:center;padding:24px}
+#alarm.show{display:flex}#amsg{font-size:28px;font-weight:600;line-height:1.4}
+#adone{min-height:88px;width:min(80vw,320px);border-radius:999px;border:0;background:var(--acc);color:var(--accfg);font:inherit;font-size:26px;font-weight:600;cursor:pointer}
+.rec{border:1px solid var(--line);border-radius:14px;padding:12px;margin:8px 0 10px;font-size:14px;color:var(--mute)}.rec b{color:var(--ink);font-size:16px}.rec .rb{margin-top:10px;min-height:44px;width:100%;font-size:15px}.rec.on .rb{background:var(--acc);color:var(--accfg);border-color:var(--acc)}
+/* 大按鈕：以騎行安全為主，所有按鈕高度至少 56px */
+#hist,#cal,#settle{min-height:56px;padding:14px 22px;font-size:18px;font-weight:500}
+#settle{top:calc(88px + env(safe-area-inset-top,0px))}
+#undo{min-height:72px;font-size:22px}
+#close,#hclose,#cclose{min-height:56px;font-size:18px}
+.cnav button{width:56px;height:56px;font-size:24px}
+.grid{gap:6px}.dd{min-height:48px;font-size:17px}
+.rb{min-height:56px;padding:10px 18px;font-size:16px}
+.rec .rb{min-height:60px;font-size:17px}
+summary{min-height:56px;align-items:center;font-size:17px}
+details details summary{font-size:16px}
+.sel2{display:flex;gap:6px}.sel2 select{min-height:56px;padding:0 10px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:17px;font-weight:500;cursor:pointer}.sel2 select:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.fix{margin-top:16px}.fr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:14px}
+.fr select{min-height:56px;padding:0 8px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:16px;cursor:pointer;max-width:100%}.fr select:disabled{opacity:.6;cursor:default}.fr select:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.ft{display:flex;align-items:center;gap:4px}.fr .rb{width:56px;padding:0}.fadd{width:100%;font-size:26px}.fbtn{display:flex;gap:8px;margin-top:8px}.fbtn .rb{flex:1}.fok{background:var(--acc);color:var(--accfg);border-color:var(--acc)}
+.fw{display:flex;gap:4px;width:100%;order:5}.wb{flex:1;min-width:0;min-height:56px;border-radius:12px;border:1px solid var(--line);background:none;color:var(--ink);font:inherit;font-size:16px;cursor:pointer}.wb.on{background:var(--acc);color:var(--accfg);border-color:var(--acc)}.wb:disabled{opacity:.6;cursor:default}.wb:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+#tap:disabled{background:var(--line);color:var(--mute);cursor:default;transform:none}#tap:disabled #n{font-size:44px}
+/* 手機版面：按鈕排在頂部列，不再浮在畫面上遮住內容 */
+html{-webkit-text-size-adjust:100%}
+body{min-height:100%;justify-content:flex-start;gap:0;touch-action:manipulation;overflow-x:hidden}
+#top{width:100%;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:12px 16px 0}
+.tl{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+#hist,#cal,#settle{position:static}
+#hist,#cal,#settle{padding:12px 18px}
+main{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(12px,3dvh,28px);padding:8px 16px 24px}
+.wrap{width:min(68vw,260px,34dvh)}
+#clock{font-size:clamp(34px,10vw,44px)}
+#undo{margin-top:clamp(10px,2dvh,18px)}
+#sheet,#hsheet{max-height:88dvh;overflow-y:auto}
+#csheet{max-height:92dvh}
+#sync{font-size:13px;color:var(--mute);margin-top:6px;min-height:18px}
+.tr{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+#ms{min-height:56px;max-width:min(52vw,230px);padding:0 10px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:16px;cursor:pointer}
+#ms:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.lockset .rb,.lockset .fr select{opacity:.5}
+/* 白天／夜間自動配色：高對比，戶外強光與夜間都看得清楚 */
+:root[data-theme="light"]{--bg:#ffffff;--ink:#000000;--mute:#3f4743;--acc:#00594a;--accfg:#ffffff;--line:#9aa5a0;--card:#f1f4f2}
+:root[data-theme="dark"]{--bg:#000000;--ink:#ffffff;--mute:#c9d1cc;--acc:#ffd60a;--accfg:#000000;--line:#5b665f;--card:#141a17}
+#awake{font-size:13px;color:var(--mute);margin-top:4px;text-align:center}
+#inst{display:block;margin:14px auto 0;min-height:56px;padding:12px 24px;border-radius:999px;border:2px solid var(--line);background:none;color:var(--ink);font:inherit;font-size:17px;cursor:pointer}
+#inst:focus-visible,#iclose:focus-visible,#idirect:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+#imask{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;justify-content:center}#imask.show{display:flex}
+#isheet{background:var(--card);color:var(--ink);width:min(100%,460px);border-radius:20px 20px 0 0;padding:24px 24px calc(24px + env(safe-area-inset-bottom,0px));max-height:88dvh;overflow-y:auto}
+#isheet h2{margin:0 0 12px;font-size:20px}#isheet p{margin:0 0 14px;font-size:16px;line-height:1.6}
+#iclose,#idirect{width:100%;min-height:56px;border-radius:12px;font:inherit;font-size:18px;cursor:pointer;margin-top:6px}
+#iclose{border:1px solid var(--line);background:none;color:var(--ink)}#idirect{border:0;background:var(--acc);color:var(--accfg)}
+/* 手機日曆：兩塊內容等寬、置中，左右留白一致 */
+@media (max-width:560px){
+#csheet{padding:20px 14px calc(20px + env(safe-area-inset-bottom,0px))}
+.cw{grid-template-columns:minmax(0,1fr);gap:20px}
+.cw>div{width:100%;max-width:380px;margin:0 auto}
+.cnav{justify-content:space-between}
+.grid{gap:5px}.dd{aspect-ratio:auto;height:48px;min-width:0}
+#mlock{max-width:380px;margin:0 auto 10px}
+.sel2 select{padding:0 6px;font-size:16px}
+#csheet #cclose{max-width:380px;display:block;margin:14px auto 0}
+}
+.acts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.acts #inst{margin:0;display:inline-block}
+#fs{min-height:56px;padding:12px 24px;border-radius:999px;border:2px solid var(--line);background:none;color:var(--ink);font:inherit;font-size:17px;cursor:pointer}
+#fs:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+#fsn{font-size:13px;color:var(--mute);margin-top:6px;text-align:center;max-width:320px}
+/* 全螢幕／沉浸模式：所有手機都能用，隱藏多餘按鈕，放大計次按鈕 */
+#fsx{display:none;position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:12px;z-index:5;min-height:56px;padding:12px 20px;border-radius:999px;border:2px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:16px;cursor:pointer}
+#fsx:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+body.imm #fsx{display:block}
+body.imm #top,body.imm .acts,body.imm #fsn,body.imm #sync,body.imm #awake{display:none}
+body.imm main{padding-top:72px}
+body.imm .wrap{width:min(80vw,360px,44dvh)}
+/* 設定面板：主畫面只留計次功能 */
+#top{justify-content:flex-start}
+#foot{width:100%;padding:0 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;justify-content:flex-start}
+#setb{min-height:60px;padding:14px 28px;border-radius:999px;border:2px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:18px;font-weight:500;cursor:pointer}
+#setb:focus-visible,#sclose:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+#smask{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;justify-content:center}#smask.show{display:flex}
+#ssheet{background:var(--card);color:var(--ink);width:min(100%,460px);border-radius:20px 20px 0 0;padding:22px 20px calc(22px + env(safe-area-inset-bottom,0px));max-height:90dvh;overflow-y:auto}
+#ssheet h2{margin:0 0 14px;font-size:20px}
+#ssheet #hist,#ssheet #cal,#ssheet #inst,#ssheet #fs{display:block;width:100%;min-height:60px;margin:0 0 10px;padding:14px 20px;border-radius:14px;border:2px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:18px;font-weight:500;cursor:pointer;text-align:center}
+#ssheet .ml{display:block;margin:6px 0 6px;font-size:14px;color:var(--mute)}
+#ssheet #ms{display:block;width:100%;max-width:none;min-height:60px;margin:0 0 10px;font-size:17px}
+#ssheet #sync,#ssheet #awake,#ssheet #fsn{max-width:none;text-align:left;margin-top:6px}
+#sclose{width:100%;min-height:60px;margin-top:12px;border-radius:14px;border:1px solid var(--line);background:none;color:var(--ink);font:inherit;font-size:18px;cursor:pointer}
+body.imm #foot{display:none}
+/* 沉浸模式：鎖住捲動與下拉，避免不小心滑出去 */
+html,body{overscroll-behavior:none}
+body.imm{position:fixed;inset:0;width:100%;height:100dvh;overflow:hidden;touch-action:none}
+body.imm button,body.imm #tap{touch-action:manipulation}
+#tap:disabled #n{font-size:40px}
+</style>
+</head>
+<body>
+<div id="top"><button id="settle">詳細結算</button></div>
+<main><div><div id="clock">--:--:--</div><div id="date"></div></div>
+<div class="wrap">
+  <svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="47" fill="none" stroke-width="2"/><circle class="bar" id="bar" cx="50" cy="50" r="47" fill="none" stroke-width="2" stroke-linecap="round" stroke-dasharray="295.3" stroke-dashoffset="0"/></svg>
+  <button id="tap" aria-label="完成一單"><span id="n">0</span><small id="tl">本小時單數</small></button>
+</div>
+<div style="text-align:center"><div id="cd">60:00</div><div id="st"></div><button id="undo">撤銷上一單</button></div>
+</main>
+<div id="foot"><button id="setb">設定</button></div>
+<div id="smask"><div id="ssheet" role="dialog" aria-modal="true"><h2>設定</h2>
+<button id="hist">歷屆結算</button>
+<button id="cal">日曆</button>
+<label for="ms" class="ml">設定以哪一台為主</label>
+<select id="ms" aria-label="以哪一台的設定為主"><option value="pc">以電腦設定為主</option><option value="phone">以手機設定為主</option></select>
+<button id="inst">加到手機桌面</button>
+<button id="fs">全螢幕</button>
+<div id="sync"></div><div id="awake"></div><div id="fsn">iPhone 沒有系統全螢幕，會改用沉浸模式（隱藏多餘按鈕）。</div>
+<button id="sclose">關閉</button></div></div>
+<div id="mask"><div id="sheet" role="dialog" aria-modal="true"><h2>本週結算</h2><p id="range"></p><div id="rows"></div><button id="close">關閉</button></div></div>
+<div id="hmask"><div id="hsheet" role="dialog" aria-modal="true"><h2>歷屆結算</h2><p>已結算的每週紀錄，點開可看每天、每小時的單數</p><div id="hrows"></div><button id="hclose">關閉</button></div></div>
+<div id="cmask"><div id="csheet" role="dialog" aria-modal="true"><div id="mlock" class="note"></div><div class="cw" id="cbody"></div><p class="note">休息時段開始時會響鬧鐘（手動設定的休息，結束時也會提醒），休息期間無法按計次按鈕。請保持此頁開啟；手機需開啟聲音。</p><button id="cclose">關閉</button></div></div>
+<div id="alarm" role="alertdialog"><div id="amsg"></div><button id="adone">知道了</button></div>
+<div id="imask"><div id="isheet" role="dialog" aria-modal="true"><h2>加到手機桌面</h2>
+<p><b>iPhone（Safari）</b><br>點下方的「分享」按鈕，再點「加入主畫面」。</p>
+<p><b>Android（Chrome）</b><br>點右上角「⋮」，再點「加到主畫面」或「安裝應用程式」。</p>
+<p>加好後桌面會出現「外賣計次」圖示，直接點開就能用。圖示打開後仍是在 claude.ai 頁面內執行，需用同一個帳號登入，資料照常同步。</p>
+<button id="idirect" style="display:none">直接安裝</button><button id="iclose">關閉</button></div></div>
+<button id="fsx">退出全螢幕</button>
+<script>
+var START=6,END=21,DAYS=["星期一","星期二","星期三","星期四","星期五","星期六","星期日"],KEY="waimai-v1";
+var ME=(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||(window.matchMedia&&matchMedia("(pointer:coarse)").matches&&Math.min(screen.width,screen.height)<820))?"phone":"pc",master=ME,dirty={},col=null,busy=false,writing=null,fx={rows:[],locked:false},FKEY="waimai-fixed-v1",data={},settled={},rest={},SKEY="waimai-settled-v1",RKEY="waimai-rest-v1";
+try{data=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){data={}}
+try{settled=JSON.parse(localStorage.getItem(SKEY)||"{}")}catch(e){settled={}}
+try{rest=JSON.parse(localStorage.getItem(RKEY)||"{}")}catch(e){rest={}}
+try{var f0=JSON.parse(localStorage.getItem(FKEY)||"null");if(f0&&f0.rows)fx=f0}catch(e){}
+function saveF(){try{localStorage.setItem(FKEY,JSON.stringify(fx))}catch(e){}dirty.cfg=1;flush()}
+function saveR(){try{localStorage.setItem(RKEY,JSON.stringify(rest))}catch(e){}dirty.cfg=1;flush()}
+function saveS(){try{localStorage.setItem(SKEY,JSON.stringify(settled))}catch(e){}dirty.cfg=1;flush()}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}dirty[dk(new Date())]=1;flush()}
+function p2(n){return (n<10?"0":"")+n}
+function dk(d){return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())}
+function day(d){var k=dk(d);if(!data[k])data[k]=[];return data[k]}
+var last=null,preview=false;
+function active(d){var h=d.getHours();return h>=START&&h<END}
+function hourCount(d){var a=data[dk(d)]||[];return a.filter(function(t){return new Date(t).getHours()===d.getHours()}).length}
+function tick(){
+  var d=new Date(),nt=(d.getHours()>=18||d.getHours()<6)?"dark":"light";
+  if(document.documentElement.getAttribute("data-theme")!==nt)document.documentElement.setAttribute("data-theme",nt);
+  document.getElementById("clock").textContent=p2(d.getHours())+":"+p2(d.getMinutes())+":"+p2(d.getSeconds());
+  document.getElementById("date").textContent=(d.getMonth()+1)+"月"+d.getDate()+"日 "+DAYS[(d.getDay()+6)%7];
+  var cd=document.getElementById("cd"),st=document.getElementById("st"),bar=document.getElementById("bar");
+  if(active(d)){
+    var left=3600-(d.getMinutes()*60+d.getSeconds());
+    cd.textContent=p2(Math.floor(left/60))+":"+p2(left%60);
+    bar.style.strokeDashoffset=295.3*(1-left/3600);
+    st.textContent=isRest(d,d.getHours())?"休息時間，到 "+p2(d.getHours()+1)+":00 結束":p2(d.getHours())+":00 – "+p2(d.getHours()+1)+":00 倒數中";
+  }else{
+    cd.textContent="60:00";bar.style.strokeDashoffset=0;
+    st.textContent=d.getHours()>=END?"今日倒數已結束":"早上 6:00 開始倒數";
+  }
+  var rst=isRest(d,d.getHours()),tp=document.getElementById("tap");
+  var on=active(d),late=d.getHours()>=END;
+  tp.disabled=rst||!on;
+  document.getElementById("n").textContent=!on?(late?"結束":"未開始"):rst?"休息":hourCount(d);
+  document.getElementById("tl").textContent=!on?(late?"倒數完成，停止計次":"早上 6:00 開始計次"):rst?"休息中，暫停計次":"本小時單數";
+  checkRest(d);
+  var sun=d.getDay()===0;
+  document.getElementById("settle").classList.toggle("show",sun||preview);
+}
+document.getElementById("tap").onclick=function(){
+  var nw=new Date();if(!active(nw)||isRest(nw,nw.getHours()))return;
+  day(new Date()).push(Date.now());save();tick();
+  if(navigator.vibrate)try{navigator.vibrate(30)}catch(e){}
+};
+document.getElementById("undo").onclick=function(){var a=day(new Date());if(a.length){a.pop();save();tick()}};
+function weekStart(d){var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-((x.getDay()+6)%7));return x}
+
+function hc(d,h){return (data[dk(d)]||[]).filter(function(t){return new Date(t).getHours()===h}).length}
+function hl(h){return h+"–"+(h+1)+"點"}
+function isRest(d,h){return (rest[dk(d)]||[]).indexOf(h)>-1||fixedRest(d,h)}
+function pd(k){var q=k.split("-");return new Date(+q[0],+q[1]-1,+q[2])}
+function weekHTML(ws,withTotal){
+  var out="",tot=0;
+  for(var i=0;i<7;i++){var x=new Date(ws);x.setDate(ws.getDate()+i);var dt=0,r="";
+    for(var h=START;h<END;h++){var c=hc(x,h);dt+=c;r+='<div class="row"><span>'+hl(h)+(isRest(x,h)?'（休息）':'')+'</span><b>'+c+' 單</b></div>'}
+    tot+=dt;out+='<details><summary><span>'+DAYS[i]+' '+(x.getMonth()+1)+'/'+x.getDate()+'</span><b>'+dt+' 單</b></summary>'+r+'</details>'}
+  if(withTotal)out+='<div class="row tot"><span>合計</span><b>'+tot+' 單</b></div>';
+  return {html:out,total:tot};
+}
+var ac=null,alT=null,fired={};
+function unlock(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state==="suspended")ac.resume()}catch(e){}}
+document.addEventListener("pointerdown",unlock);
+var wl=null;
+function keepAwake(){
+  var st=document.getElementById("awake");
+  try{
+    if(!navigator.wakeLock){st.textContent="螢幕常亮：此瀏覽器不支援，請把手機自動鎖定改成永不";return}
+    if(document.visibilityState!=="visible"||(wl&&!wl.released))return;
+    navigator.wakeLock.request("screen").then(function(x){wl=x;st.textContent="螢幕常亮：已開啟";x.addEventListener("release",function(){st.textContent="螢幕常亮：已中斷，點一下畫面重新開啟"})}).catch(function(){st.textContent="螢幕常亮：無法開啟，請把手機自動鎖定改成永不"});
+  }catch(e){}
+}
+document.addEventListener("pointerdown",keepAwake);document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")keepAwake()});
+function beep(){if(!ac)return;try{[0,.35,.7].forEach(function(t){var o=ac.createOscillator(),g=ac.createGain();o.frequency.value=880;g.gain.value=.25;o.connect(g);g.connect(ac.destination);o.start(ac.currentTime+t);o.stop(ac.currentTime+t+.2)})}catch(e){}if(navigator.vibrate)try{navigator.vibrate([200,100,200])}catch(e){}}
+function alarm(msg){
+  document.getElementById("amsg").textContent=msg;document.getElementById("alarm").classList.add("show");
+  beep();var n=0;clearInterval(alT);alT=setInterval(function(){if(++n>8){clearInterval(alT);return}beep()},3000);
+  try{if(window.Notification&&Notification.permission==="granted")new Notification("外賣小時計次",{body:msg})}catch(e){}
+}
+document.getElementById("adone").onclick=function(){clearInterval(alT);document.getElementById("alarm").classList.remove("show")};
+function checkRest(d){
+  if(d.getMinutes()>1)return;var h=d.getHours(),k=dk(d)+"-"+h;
+  if(isRest(d,h)&&!isRest(d,h-1)&&!fired["s"+k]){fired["s"+k]=1;alarm("休息時間開始（"+hl(h)+"），先停好車休息一下")}
+  if((rest[dk(d)]||[]).indexOf(h-1)>-1&&!fixedRest(d,h-1)&&!isRest(d,h)&&h-1>=START&&!fired["e"+k]){fired["e"+k]=1;alarm("休息結束，準備繼續接單")}
+}
+function recHour(){
+  var days=Object.keys(data).filter(function(k){return data[k].length}),best=null;
+  if(!days.length)return null;
+  for(var h=START;h<END;h++){var sum=0;days.forEach(function(k){sum+=data[k].filter(function(t){return new Date(t).getHours()===h}).length});
+    var avg=sum/days.length;if(!best||avg<best.avg)best={h:h,avg:avg}}
+  return best;
+}
+function fixedRest(d,h){if(!fx.locked)return false;var wd=(d.getDay()+6)%7,k=dk(d);return fx.rows.some(function(r){return (r.wd==='c'?(r.days||[]).indexOf(wd)>-1:(r.wd<0||r.wd===wd))&&h>=r.s&&h<r.e&&(!r.until||k<=r.until)})}
+var WDN=["每天","週一","週二","週三","週四","週五","週六","週日"];
+function opt(v,t,cur){return '<option value="'+v+'"'+(String(v)===String(cur)?' selected':'')+'>'+t+'</option>'}
+function wk(r,i,L){var o='<div class="fw">',d=r.days||[];["一","二","三","四","五","六","日"].forEach(function(n,j){o+='<button class="wb'+(d.indexOf(j)>-1?' on':'')+'" data-fw="'+i+':'+j+'"'+(L?' disabled':'')+' aria-label="週'+n+'">'+n+'</button>'});return o+'</div>'}
+function fixedHTML(){
+  var bad=fx.rows.some(function(r){return r.wd==='c'&&!(r.days&&r.days.length)}),L=fx.locked,dis=L?' disabled':'',h='<div class="fix"><div class="ctt">固定休息時段</div>';
+  fx.rows.forEach(function(r,i){
+    var a='',b='',c='',u='',w='';
+    for(var k=-1;k<7;k++)w+=opt(k,WDN[k+1],r.wd);
+    w+=opt('c','自訂（可複選）',r.wd);
+    for(var x=START;x<END;x++)a+=opt(x,x+':00',r.s);
+    for(var y=r.s+1;y<=END;y++)b+=opt(y,y+':00',r.e);
+    u=opt("","一直重複",r.u)+opt("m","重複到本月底",r.u)+opt("y","重複到今年底",r.u);
+    var at='data-fi="'+i+'"'+dis+' data-ff=';
+    h+='<div class="fr"><select '+at+'"wd" aria-label="星期">'+w+'</select><span class="ft"><select '+at+'"s" aria-label="開始時間">'+a+'</select>–<select '+at+'"e" aria-label="結束時間">'+b+'</select></span><select '+at+'"u" aria-label="重複範圍">'+u+'</select>'+(r.wd==='c'?wk(r,i,L):'')+(L?'':'<button class="rb" data-fd="'+i+'" aria-label="刪除這一行">✕</button>')+'</div>'});
+  h+='<button class="rb fadd" data-fa="add"'+dis+' aria-label="新增一行">＋</button>';
+  if(fx.rows.length)h+=(bad?'<div class="note">自訂的星期請至少選一天</div>':'')+'<div class="fbtn"><button class="rb fok" data-fa="ok"'+(dis||bad?' disabled':'')+'>'+(L?'已確定':'確定')+'</button><button class="rb" data-fa="clear">清除</button></div>';
+  return h+'</div>';
+}
+function fixAct(fa,fd,fw){
+  if(fw&&!fx.locked){var q=fw.getAttribute("data-fw").split(":"),r=fx.rows[+q[0]],j=+q[1];
+    if(r){r.days=r.days||[];var z=r.days.indexOf(j);if(z>-1)r.days.splice(z,1);else{r.days.push(j);r.days.sort()}}}
+  else if(fd&&!fx.locked)fx.rows.splice(+fd.getAttribute("data-fd"),1);
+  else if(fa){var a=fa.getAttribute("data-fa"),n=new Date();
+    if(a==="add"&&!fx.locked)fx.rows.push({wd:-1,s:10,e:11,u:"",until:""});
+    if(a==="ok"&&fx.rows.length&&!fx.locked&&!fx.rows.some(function(r){return r.wd==="c"&&!(r.days&&r.days.length)})){fx.rows.forEach(function(r){r.until=r.u==="m"?dk(new Date(n.getFullYear(),n.getMonth()+1,0)):r.u==="y"?n.getFullYear()+"-12-31":""});fx.locked=true;unlock()}
+    if(a==="clear"){fx.rows=[];fx.locked=false}}
+  saveF();renderCal();tick();
+}
+var cy,cm,csel;
+function renderCal(){
+  var now=new Date(),off=(new Date(cy,cm,1).getDay()+6)%7,dim=new Date(cy,cm+1,0).getDate();
+  var yo="",mo="",y0=Math.min(now.getFullYear()-3,cy),y1=Math.max(now.getFullYear()+2,cy);
+  for(var y=y0;y<=y1;y++)yo+='<option value="'+y+'"'+(y===cy?' selected':'')+'>'+y+'年</option>';
+  for(var q=0;q<12;q++)mo+='<option value="'+q+'"'+(q===cm?' selected':'')+'>'+(q+1)+'月</option>';
+  var L='<div><div class="cnav"><button data-m="-1" aria-label="上個月">‹</button><span class="sel2"><select id="sy" aria-label="選擇年份">'+yo+'</select><select id="sm" aria-label="選擇月份">'+mo+'</select></span><button data-m="1" aria-label="下個月">›</button></div><div class="grid">';
+  ["一","二","三","四","五","六","日"].forEach(function(w){L+='<div class="h">'+w+'</div>'});
+  for(var i=0;i<off;i++)L+='<div></div>';
+  for(var n=1;n<=dim;n++){var k=dk(new Date(cy,cm,n));
+    L+='<button class="dd'+(k===dk(now)?' today':'')+(k===dk(csel)?' sel':'')+(((data[k]&&data[k].length)||(rest[k]&&rest[k].length))?' has':'')+'" data-d="'+k+'">'+n+'</button>'}
+  L+='</div></div>';
+  var tot=0,R="";
+  for(var h=START;h<END;h++){var c=hc(csel,h),r=isRest(csel,h);tot+=c;
+    var can=new Date(csel.getFullYear(),csel.getMonth(),csel.getDate(),h+1)>now;
+    R+='<div class="hr'+(r?' rest':'')+'"><span>'+hl(h)+'　<b>'+c+' 單</b></span><button class="rb" data-h="'+h+'"'+(can&&!fixedRest(csel,h)?'':' disabled')+'>'+(fixedRest(csel,h)?'固定休息':(r?'休息中':'設為休息'))+'</button></div>'}
+  var rc=recHour(),RB="";
+  if(!rc)RB='<div class="rec">累積幾天紀錄後，這裡會推薦休息時段。</div>';
+  else if(new Date(csel.getFullYear(),csel.getMonth(),csel.getDate(),rc.h+1)>now){var ron=isRest(csel,rc.h);
+    RB='<div class="rec'+(ron?' on':'')+'">推薦休息時段：<b>'+hl(rc.h)+'</b><br>依過往紀錄，這個時段平均每天只有 '+(Math.round(rc.avg*10)/10)+' 單。僅供參考，是否休息由你決定。<button class="rb" data-h="'+rc.h+'"'+(fixedRest(csel,rc.h)?' disabled':'')+'>'+(fixedRest(csel,rc.h)?'已是固定休息時段':ron?'已設為休息（點一下取消）':'設為休息時段')+'</button></div>'}
+  R='<div><div class="ctt">'+(csel.getMonth()+1)+'月'+csel.getDate()+'日 '+DAYS[(csel.getDay()+6)%7]+'</div><div class="cs">全天 '+tot+' 單</div>'+R+'</div>';
+  L=L.slice(0,-6)+RB+fixedHTML()+'</div>';
+  document.getElementById("cbody").innerHTML=L+R;
+  var nm=master==="pc"?"電腦":"手機",me=ME==="pc"?"電腦":"手機";
+  document.getElementById("mlock").textContent=master!==ME?"目前以"+nm+"的設定為主，這台不能修改休息設定。要在這台設定，請先把日曆按鈕下方的選單改成「以"+me+"設定為主」。":"";
+  document.getElementById("csheet").classList.toggle("lockset",master!==ME);
+}
+document.getElementById("cal").onclick=function(){var n=new Date();cy=n.getFullYear();cm=n.getMonth();csel=n;renderCal();document.getElementById("cmask").classList.add("show")};
+document.getElementById("cclose").onclick=function(){document.getElementById("cmask").classList.remove("show")};
+document.getElementById("cmask").onclick=function(e){if(e.target.id==="cmask")e.target.classList.remove("show")};
+document.getElementById("cbody").onchange=function(e){
+  var ff=e.target.getAttribute("data-ff");
+  if(ff&&master!==ME){renderCal();return}
+  if(ff&&!fx.locked){var r=fx.rows[+e.target.getAttribute("data-fi")],v=e.target.value;
+    if(r){if(ff==="u")r.u=v;else if(ff==="wd"){r.wd=v==="c"?"c":+v;if(v==="c"&&!r.days)r.days=[]}else r[ff]=+v;if(r.e<=r.s)r.e=r.s+1;saveF();renderCal()}return}
+  if(e.target.id==="sy"){cy=+e.target.value;renderCal()}
+  else if(e.target.id==="sm"){cm=+e.target.value;renderCal()}
+};
+document.getElementById("cbody").onclick=function(e){
+  var lk=e.target.closest("[data-fa],[data-fd],[data-fw],[data-h]");if(lk&&master!==ME)return;
+  var fa=e.target.closest("[data-fa]"),fd=e.target.closest("[data-fd]"),fw=e.target.closest("[data-fw]");
+  if(fa||fd||fw){fixAct(fa,fd,fw);return}
+  var m=e.target.closest("[data-m]"),d=e.target.closest("[data-d]"),h=e.target.closest("[data-h]");
+  if(m){cm+=+m.getAttribute("data-m");if(cm>11){cm=0;cy++}if(cm<0){cm=11;cy--}renderCal()}
+  else if(d){csel=pd(d.getAttribute("data-d"));renderCal()}
+  else if(h&&!h.disabled){var k=dk(csel),v=+h.getAttribute("data-h"),a=rest[k]||(rest[k]=[]),i=a.indexOf(v);
+    if(i>-1)a.splice(i,1);else{a.push(v);a.sort(function(x,y){return x-y});unlock();try{if(window.Notification&&Notification.permission==="default")Notification.requestPermission()}catch(x){}}
+    if(!a.length)delete rest[k];saveR();renderCal();tick()}
+};
+document.getElementById("settle").onclick=function(){
+  var ws=weekStart(new Date());
+  if(new Date().getDay()===0){settled[ws.getTime()]=1;saveS()}
+  var e=new Date(ws);e.setDate(ws.getDate()+6);
+  document.getElementById("range").textContent=(ws.getMonth()+1)+"/"+ws.getDate()+" – "+(e.getMonth()+1)+"/"+e.getDate()+" 送單數，點每天可看每小時";
+  document.getElementById("rows").innerHTML=weekHTML(ws,true).html;
+  document.getElementById("mask").classList.add("show");
+};
+document.getElementById("close").onclick=function(){document.getElementById("mask").classList.remove("show")};
+document.getElementById("mask").onclick=function(e){if(e.target.id==="mask")e.target.classList.remove("show")};
+document.getElementById("hist").onclick=function(){
+  var cur=weekStart(new Date()).getTime(),set={};
+  Object.keys(settled).forEach(function(k){set[k]=1});
+  var ws=Object.keys(set).map(Number).sort(function(a,b){return b-a}),h="";
+  if(!ws.length)h='<p>還沒有結算紀錄，星期日點「詳細結算」後，這週會出現在這裡。</p>';
+  ws.forEach(function(t){var s0=new Date(t),e=new Date(t);e.setDate(s0.getDate()+6);var w=weekHTML(s0,false);
+    h+='<details><summary><span>'+(s0.getMonth()+1)+'/'+s0.getDate()+' – '+(e.getMonth()+1)+'/'+e.getDate()+(t===cur?'（本週）':'')+'</span><b>'+w.total+' 單</b></summary>'+w.html+'</details>'});
+  document.getElementById("hrows").innerHTML=h;
+  document.getElementById("hmask").classList.add("show");
+};
+document.getElementById("hclose").onclick=function(){document.getElementById("hmask").classList.remove("show")};
+document.getElementById("hmask").onclick=function(e){if(e.target.id==="hmask")e.target.classList.remove("show")};
+document.getElementById("clock").ondblclick=function(){preview=!preview;tick()};
+
+function setSync(t){var e=document.getElementById("sync");if(e)e.textContent=t}
+function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(data));localStorage.setItem(SKEY,JSON.stringify(settled));localStorage.setItem(RKEY,JSON.stringify(rest));localStorage.setItem(FKEY,JSON.stringify(fx))}catch(e){}}
+function msUI(){document.getElementById("ms").value=master}
+function afterRemote(){msUI();persistLocal();tick();if(document.getElementById("cmask").classList.contains("show"))renderCal()}
+async function flush(){
+  if(!col||busy)return;busy=true;var k=null;
+  try{while(Object.keys(dirty).length){k=Object.keys(dirty)[0];delete dirty[k];writing=k;
+      if(k==="cfg")await col.doc("cfg").set({rest:rest,fx:fx,settled:settled,master:master});
+      else await col.doc("d-"+k).set({t:data[k]||[]});
+      writing=null;k=null}
+    setSync("已同步到雲端")}
+  catch(e){if(k)dirty[k]=1;writing=null;setSync("同步失敗，下次操作會再試")}
+  busy=false;
+}
+async function initSync(){
+  try{
+    if(!(window.claude&&claude.use)){setSync("資料存在這支手機上");document.getElementById("ms").style.display="none";var ml=document.querySelector("#ssheet .ml");if(ml)ml.style.display="none";return}
+    var user=await claude.use("user"),db=await claude.use("db");
+    if(!user||!db){setSync("僅存本機（請登入 claude.ai 才能同步）");return}
+    var id=await user.id();if(!id){setSync("僅存本機");return}
+    setSync("同步中…");var c=db.collection("data/users/"+id),first=true;
+    c.onSnapshot(function(snap){
+      if(first){first=false;var rm={};snap.docs.forEach(function(d){rm[d.id]=d.data()||{}});
+        Object.keys(rm).forEach(function(i){var v=rm[i];
+          if(i==="cfg"){master=v.master||"pc";if(master!==ME){if(v.rest)rest=v.rest;if(v.fx&&v.fx.rows)fx=v.fx}if(v.settled)Object.keys(v.settled).forEach(function(z){settled[z]=1})}
+          else if(i.indexOf("d-")===0){var k=i.slice(2),rt=v.t||[],lt=data[k]||[],u=rt.concat(lt.filter(function(x){return rt.indexOf(x)<0})).sort(function(a,b){return a-b});data[k]=u;if(u.length!==rt.length)dirty[k]=1}});
+        Object.keys(data).forEach(function(k){if(data[k].length&&!rm["d-"+k])dirty[k]=1});
+        if(!rm.cfg){master=ME;dirty.cfg=1}
+        col=c;afterRemote();flush();return}
+      snap.docChanges().forEach(function(ch){var i=ch.doc.id,v=ch.doc.data()||{};
+        if(i==="cfg"){if(ch.type==="removed"||dirty.cfg||writing==="cfg")return;master=v.master||master;if(master!==ME){rest=v.rest||{};if(v.fx&&v.fx.rows)fx=v.fx}Object.keys(v.settled||{}).forEach(function(z){settled[z]=1})}
+        else if(i.indexOf("d-")===0){var k=i.slice(2);if(dirty[k]||writing===k)return;if(ch.type==="removed")delete data[k];else data[k]=v.t||[]}});
+      afterRemote();if(!busy)setSync("已同步到雲端");
+    },function(){setSync("同步失敗，僅存本機")});
+  }catch(e){setSync("僅存本機")}
+}
+document.getElementById("ms").onchange=function(){master=this.value;dirty.cfg=1;flush();afterRemote()};
+var nat=false,want=false;
+function fsEl(){return document.fullscreenElement||document.webkitFullscreenElement}
+function immOn(){document.body.classList.add("imm");try{localStorage.setItem("waimai-imm","1")}catch(e){}document.getElementById("fs").textContent="退出全螢幕";window.scrollTo(0,0)}
+function immOff(){document.body.classList.remove("imm");try{localStorage.removeItem("waimai-imm")}catch(e){}want=false;document.getElementById("fs").textContent="全螢幕";if(fsEl()){try{(document.exitFullscreen||document.webkitExitFullscreen).call(document)}catch(e){}}nat=false}
+function fsToggle(){
+  if(document.body.classList.contains("imm")){immOff();return}
+  immOn();
+  try{var E=document.documentElement,r=E.requestFullscreen||E.webkitRequestFullscreen;
+    if(r){var pr=r.call(E);if(pr&&pr.then)pr.then(function(){nat=true;want=true}).catch(function(){})}}catch(e){}
+}
+document.getElementById("fs").onclick=fsToggle;document.getElementById("fsx").onclick=fsToggle;
+function fsChange(){if(!fsEl())nat=false}
+document.addEventListener("pointerdown",function(){
+  if(!(document.body.classList.contains("imm")&&want&&!fsEl()))return;
+  try{var E=document.documentElement,r=E.requestFullscreen||E.webkitRequestFullscreen;if(r){var pr=r.call(E);if(pr&&pr.then)pr.then(function(){nat=true}).catch(function(){})}}catch(e){}
+});
+try{if(localStorage.getItem("waimai-imm"))immOn()}catch(e){}
+document.addEventListener("fullscreenchange",fsChange);document.addEventListener("webkitfullscreenchange",fsChange);
+document.getElementById("setb").onclick=function(){document.getElementById("smask").classList.add("show")};
+document.getElementById("sclose").onclick=function(){document.getElementById("smask").classList.remove("show")};
+document.getElementById("smask").onclick=function(e){if(e.target.id==="smask")e.target.classList.remove("show")};
+["hist","cal","inst","fs"].forEach(function(i){document.getElementById(i).addEventListener("click",function(){document.getElementById("smask").classList.remove("show")})});
+var dp=null;
+window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();dp=e;document.getElementById("idirect").style.display="block"});
+document.getElementById("inst").onclick=function(){document.getElementById("imask").classList.add("show")};
+document.getElementById("iclose").onclick=function(){document.getElementById("imask").classList.remove("show")};
+document.getElementById("imask").onclick=function(e){if(e.target.id==="imask")e.target.classList.remove("show")};
+document.getElementById("idirect").onclick=function(){if(dp){dp.prompt();dp=null}};
+try{var cv=document.createElement("canvas");cv.width=cv.height=180;var cx=cv.getContext("2d");cx.fillStyle="#0e7c66";cx.fillRect(0,0,180,180);cx.fillStyle="#fff";cx.beginPath();cx.arc(90,90,62,0,7);cx.fill();cx.fillStyle="#0e7c66";cx.font="bold 46px sans-serif";cx.textAlign="center";cx.textBaseline="middle";cx.fillText("外賣",90,92);document.getElementById("ati").href=cv.toDataURL("image/png")}catch(e){}
+keepAwake();setInterval(keepAwake,30000);
+msUI();initSync();
+tick();setInterval(tick,1000);
+</script>
+</body>
+</html>
